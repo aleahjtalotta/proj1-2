@@ -54,18 +54,11 @@ void* ThreadFunc(void* arg) {
     }
     
     int m = 1;
+    int row_index = data->thread_id * m;
     int total_rows = data->input_rows->size();
     
-    while (m <= total_rows && !*(data->should_exit)) {
-        if (Timings_TimeoutExpired(data->start_time, data->timeout_ms)) {
-            *(data->should_exit) = true;
-            break;
-        }
-        
-        int row_index = data->thread_id * m;
-        if (row_index >= total_rows) {
-            break;
-        }
+    if (row_index < total_rows && !*(data->should_exit) && 
+        !Timings_TimeoutExpired(data->start_time, data->timeout_ms)) {
         
         const InputRow& row = (*data->input_rows)[row_index];
         char encrypted[65];
@@ -78,8 +71,6 @@ void* ThreadFunc(void* arg) {
         
         (*data->output_rows)[row_index] = encrypted;
         ThreadLog("[thread %d] completed row %d", data->thread_id, row_index);
-        
-        m++;
     }
     
     ThreadLog("[thread %d] returned", data->thread_id);
@@ -111,6 +102,8 @@ int main(int argc, char** argv) {
             input_rows.push_back(row);
         }
     }
+    
+    std::cin.clear();
     
     int k;
     std::cout << "Enter max threads (1 - 8): ";
@@ -183,7 +176,9 @@ int main(int argc, char** argv) {
     ThreadLog("Thread Start Encryption");
     for (size_t i = 0; i < input_rows.size(); i++) {
         if (!output_rows[i].empty()) {
-            ThreadLog("%zu %s %s", i, input_rows[i].text.c_str(), output_rows[i].c_str());
+            std::string hash = output_rows[i];
+            std::string truncated = hash.substr(0, 16) + "..." + hash.substr(hash.length() - 16);
+            ThreadLog("%zu %s %s", i, input_rows[i].text.c_str(), truncated.c_str());
         }
     }
     
