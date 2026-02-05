@@ -12,7 +12,8 @@
 #include <fstream>
 
 int main() {
-int k;
+
+int k
 std::ifstream tty_in("/dev/tty");
 if (tty_in) {
     int var;
