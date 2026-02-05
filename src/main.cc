@@ -8,6 +8,7 @@
 #include <sys/sysinfo.h>
 #include <pthread.h>
 #include <cstring>
+#include <cstdio>
 
 #include "../lib/cli_parser.h"
 #include "../lib/error.h"
@@ -54,7 +55,7 @@ void* ThreadFunc(void* arg) {
     }
     
     int m = 1;
-    int row_index = data->thread_id * m;
+    int row_index = (data->thread_id - 1) * m;
     int total_rows = data->input_rows->size();
     
     if (row_index < total_rows && !*(data->should_exit) && 
@@ -103,9 +104,9 @@ int main(int argc, char** argv) {
         }
     }
     
-    
     int k;
     std::cout << "Enter max threads (1 - 8): ";
+    fflush(stdout);
     std::ifstream tty_in("/dev/tty");
     if (tty_in) {
         tty_in >> k;
