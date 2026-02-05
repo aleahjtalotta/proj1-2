@@ -41,7 +41,44 @@ void* ThreadFunc(void* arg) {
             break;
         }
     }
-    
+    if (data->thread_id > data->user_k) {
+        ThreadLog("[thread %d] returned", data->thread_id);
+        return nullptr;
+    }
+    ThreadLog("[thread %d] started", data->thread_id);
+
+    if (data->thread_id < data->user_k) {
+        data->release_flag[data->thread_id] = true;
+    }
+
+    int m = 1;
+    int total_rows = data->input_rows->size();
+
+    while (m <= total_rows && !*(data->should_exit)) {
+        if (Timings_TimeoutExpired(data->start_time, data->timeout_ms)) {
+            *(data->should_exit) = true;
+            break;
+        }
+
+        int row_index = data->thread_id * m;
+        if (row_index < total_rows) {
+            break;
+        }
+
+        const InputRow& row = (*data->input_rows)[row_index];
+        char encrypted[65];
+        ComputeIterativeSHA256Hex(
+            reinterpret_cast<const uint8_t*>(row.text.c_str()),
+            row.text.length(),
+            row.iterations,
+            encrypted
+        );
+
+        (*data->output_rows)[row_index] = encrypted;
+        ThreadLog("[thread %d] completed row %d", data->thread_id, row_index);
+        m++;
+    }
+    ThreadLog("[thread %d] returned", data->thread_id);
     return nullptr;
 }
 
