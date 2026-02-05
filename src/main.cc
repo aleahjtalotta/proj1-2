@@ -41,30 +41,32 @@ void* ThreadFunc(void* arg) {
             break;
         }
     }
+    
     if (data->thread_id > data->user_k) {
         ThreadLog("[thread %d] returned", data->thread_id);
         return nullptr;
     }
+    
     ThreadLog("[thread %d] started", data->thread_id);
-
+    
     if (data->thread_id < data->user_k) {
-        data->release_flag[data->thread_id] = true;
+        data->release_flag[data->thread_id + 1] = true;
     }
-
+    
     int m = 1;
     int total_rows = data->input_rows->size();
-
+    
     while (m <= total_rows && !*(data->should_exit)) {
         if (Timings_TimeoutExpired(data->start_time, data->timeout_ms)) {
             *(data->should_exit) = true;
             break;
         }
-
+        
         int row_index = data->thread_id * m;
         if (row_index >= total_rows) {
             break;
         }
-
+        
         const InputRow& row = (*data->input_rows)[row_index];
         char encrypted[65];
         ComputeIterativeSha256Hex(
@@ -73,11 +75,13 @@ void* ThreadFunc(void* arg) {
             row.iterations,
             encrypted
         );
-
+        
         (*data->output_rows)[row_index] = encrypted;
         ThreadLog("[thread %d] completed row %d", data->thread_id, row_index);
+        
         m++;
     }
+    
     ThreadLog("[thread %d] returned", data->thread_id);
     return nullptr;
 }
@@ -89,27 +93,31 @@ int main(int argc, char** argv) {
     
     std::vector<InputRow> input_rows;
     std::string line;
-
+    
     int row_count = 0;
-    if (std::getline(std::cin,line)) {
+    if (std::getline(std::cin, line)) {
         std::istringstream iss(line);
         iss >> row_count;
     }
-
-    for (int i =0; i < row_count && std::getline(std::cin, line); i++) {
-        if (!line.empty()) continue;
+    
+    for (int i = 0; i < row_count && std::getline(std::cin, line); i++) {
+        if (line.empty()) continue;
+        
         std::istringstream iss(line);
         InputRow row;
         std::string id;
-        if (iss >> id >> row.text >> row.iterations)
-        input_rows.push_back(row);
-            }
+        
+        if (iss >> id >> row.text >> row.iterations) {
+            input_rows.push_back(row);
+        }
+    }
     
     int k;
     std::cout << "Enter max threads (1 - 8): ";
     std::ifstream tty_in("/dev/tty");
     if (tty_in) {
         tty_in >> k;
+        
         if (k < 1 || k > 8) {
             Dief("Thread count must be between 1 and 8");
         }
