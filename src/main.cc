@@ -103,13 +103,11 @@ int main(int argc, char** argv) {
         }
     }
     
-    std::cin.clear();
     
     int k;
     std::cout << "Enter max threads (1 - 8): ";
     std::ifstream tty_in("/dev/tty");
     if (tty_in) {
-        tty_in.clear();  
         tty_in >> k;
         
         if (k < 1 || k > 8) {
