@@ -10,9 +10,16 @@
 #include <vector>
 #include <fstream>
 
+int main() {
+    // Your code here
+    return 0;
+}
+int k;
 std::ifstream tty_in("/dev/tty");
 if (tty_in) {
     int var;
     tty_in >> var;
+    k = var;
+    std::cout << "You entered Var:" << var << std::endl;
 }
  
