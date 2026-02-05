@@ -1,11 +1,12 @@
 // Copyright Aleah Talotta 2026
 
 #include <iostream>
-//#include "cli_parser.h" 
-#include "error.h"
-#include "thread_log.h"
-#include "timings.h"
-#include "sha256.h"
+
+#include "../lib/cli_parser.h"
+#include "../lib/error.h"
+#include "../lib/sha256.h"
+#include "../lib/thread_log.h"
+#include "../lib/timings.h"
 
 #include <vector>
 #include <fstream>
