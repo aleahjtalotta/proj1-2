@@ -1,6 +1,5 @@
 // Copyright Aleah Talotta 2026
 
-
 #include <iostream>
 #include <vector>
 #include <fstream>
@@ -30,19 +29,20 @@ struct ThreadData {
     int user_k;
     uint32_t timeout_ms;
     Timings_t start_time;
-
 };
 
 void* ThreadFunc(void* arg) {
     ThreadData* data = static_cast<ThreadData*>(arg);
 
     while (!data->release_flag[data->thread_id] && !*(data->should_exit)) {
-        Timeing_SleepMs(1);
+        Timings_SleepMs(1);
         if (Timings_TimeoutExpired(data->start_time, data->timeout_ms)) {
             *(data->should_exit) = true;
             break;
         }
     }
+    
+    return nullptr;
 }
 
 int main(int argc, char** argv) {
@@ -50,19 +50,15 @@ int main(int argc, char** argv) {
     uint32_t timeout_ms;
     CliParse(argc, argv, &mode, &timeout_ms);
     
-}
-
-
-int k;
-std::cout << "Enter max threads (1 - 8): "; 
-std::ifstream tty_in("/dev/tty");
-if (tty_in) {
-    tty_in >> k; 
-}
-
-        int n = get_nprocs();
-
-        return 0;
+    int k;
+    std::cout << "Enter max threads (1 - 8): "; 
+    std::ifstream tty_in("/dev/tty");
+    if (tty_in) {
+        tty_in >> k; 
+    }
+    
+    int n = get_nprocs();
+    
     std::vector<InputRow> input_rows;
     std::string line;
     while (std::getline(std::cin, line)) {
@@ -76,5 +72,5 @@ if (tty_in) {
         }
     }
     
-    
     return 0;
+}
