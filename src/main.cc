@@ -54,14 +54,21 @@ void* ThreadFunc(void* arg) {
         data->release_flag[data->thread_id + 1] = true;
     }
     
-    int row_index = data->thread_id;
+    int m = 1;
     int total_rows = data->input_rows->size();
     
-    if (row_index <= total_rows && !*(data->should_exit) && 
-        !Timings_TimeoutExpired(data->start_time, data->timeout_ms)) {
+    while (m <= total_rows && !*(data->should_exit)) {
+        if (Timings_TimeoutExpired(data->start_time, data->timeout_ms)) {
+            *(data->should_exit) = true;
+            break;
+        }
         
-        int actual_index = row_index - 1;
-        const InputRow& row = (*data->input_rows)[actual_index];
+        int row_index = data->thread_id * m;
+        if (row_index >= total_rows) {
+            break;
+        }
+        
+        const InputRow& row = (*data->input_rows)[row_index];
         char encrypted[65];
         ComputeIterativeSha256Hex(
             reinterpret_cast<const uint8_t*>(row.text.c_str()),
@@ -70,8 +77,10 @@ void* ThreadFunc(void* arg) {
             encrypted
         );
         
-        (*data->output_rows)[actual_index] = encrypted;
-        ThreadLog("[thread %d] completed row %d", data->thread_id, actual_index);
+        (*data->output_rows)[row_index] = encrypted;
+        ThreadLog("[thread %d] completed row %d", data->thread_id, row_index);
+        
+        m++;
     }
     
     ThreadLog("[thread %d] returned", data->thread_id);
@@ -177,12 +186,8 @@ int main(int argc, char** argv) {
     for (size_t i = 0; i < input_rows.size(); i++) {
         if (!output_rows[i].empty()) {
             std::string hash = output_rows[i];
-            if (hash.length() > 32) {
-                std::string truncated = hash.substr(0, 16) + "..." + hash.substr(hash.length() - 16);
-                ThreadLog("%zu %s %s", i, input_rows[i].text.c_str(), truncated.c_str());
-            } else {
-                ThreadLog("%zu %s %s", i, input_rows[i].text.c_str(), hash.c_str());
-            }
+            std::string truncated = hash.substr(0, 16) + "..." + hash.substr(hash.length() - 16);
+            ThreadLog("%zu %s %s", i, input_rows[i].text.c_str(), truncated.c_str());
         }
     }
     
