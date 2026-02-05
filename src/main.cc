@@ -61,7 +61,7 @@ void* ThreadFunc(void* arg) {
         }
 
         int row_index = data->thread_id * m;
-        if (row_index < total_rows) {
+        if (row_index >= total_rows) {
             break;
         }
 
@@ -87,27 +87,98 @@ int main(int argc, char** argv) {
     uint32_t timeout_ms;
     CliParse(argc, argv, &mode, &timeout_ms);
     
+    std::vector<InputRow> input_rows;
+    std::string line;
+
+    int row_count = 0;
+    if (std::getline(std::cin,line)) {
+        std::istringstream iss(line);
+        iss >> row_count;
+    }
+
+    for (int i =0; i < row_count && std::getline(std::cin, line); i++) {
+        if (!line.empty()) continue;
+        std::istringstream iss(line);
+        InputRow row;
+        std::string id;
+        if (iss >> id >> row.text >> row.iterations)
+        input_rows.push_back(row);
+            }
+    
     int k;
-    std::cout << "Enter max threads (1 - 8): "; 
+    std::cout << "Enter max threads (1 - 8): ";
     std::ifstream tty_in("/dev/tty");
     if (tty_in) {
-        tty_in >> k; 
+        tty_in >> k;
+        if (k < 1 || k > 8) {
+            Dief("Thread count must be between 1 and 8");
+        }
+    } else {
+        Die("Cannot open /dev/tty for input");
     }
     
     int n = get_nprocs();
+    std::vector<std::string> output_rows(input_rows.size());
     
-    std::vector<InputRow> input_rows;
-    std::string line;
-    while (std::getline(std::cin, line)) {
-        if (!line.empty()) {
-            InputRow row;
-            std::istringstream iss(line);
-            std::string id;
-            if (iss >> id >> row.text >> row.iterations) {
-                input_rows.push_back(row);
-            }
+    volatile bool should_exit = false;
+    volatile bool* release_flags = new bool[n + 1];
+    for (int i = 0; i <= n; i++) {
+        release_flags[i] = false;
+    }
+    
+    Timings_t start_time = Timings_NowMs();
+    
+    std::vector<ThreadData> thread_data(n);
+    std::vector<pthread_t> threads(n);
+    
+    for (int i = 0; i < n; i++) {
+        thread_data[i].thread_id = i + 1;
+        thread_data[i].should_exit = &should_exit;
+        thread_data[i].release_flag = release_flags;
+        thread_data[i].input_rows = &input_rows;
+        thread_data[i].output_rows = &output_rows;
+        thread_data[i].user_k = k;
+        thread_data[i].timeout_ms = timeout_ms;
+        thread_data[i].start_time = start_time;
+        
+        pthread_create(&threads[i], nullptr, ThreadFunc, &thread_data[i]);
+    }
+    
+    if (mode == CLI_MODE_ALL) {
+        for (int i = 1; i <= k; i++) {
+            release_flags[i] = true;
+        }
+    } 
+    else if (mode == CLI_MODE_RATE) {
+        for (int i = 1; i <= k; i++) {
+            release_flags[i] = true;
+            Timings_SleepMs(1);
+        }
+    }
+    else if (mode == CLI_MODE_THREAD) {
+        release_flags[1] = true;
+    }
+    
+    while (!should_exit) {
+        if (Timings_TimeoutExpired(start_time, timeout_ms)) {
+            should_exit = true;
+            break;
+        }
+        Timings_SleepMs(100);
+    }
+    
+    should_exit = true;
+    for (int i = 0; i < n; i++) {
+        pthread_join(threads[i], nullptr);
+    }
+    
+    ThreadLog("Thread Start Encryption");
+    for (size_t i = 0; i < input_rows.size(); i++) {
+        if (!output_rows[i].empty()) {
+            ThreadLog("%zu %s %s", i, input_rows[i].text.c_str(), output_rows[i].c_str());
         }
     }
     
+    delete[] release_flags;
     return 0;
 }
