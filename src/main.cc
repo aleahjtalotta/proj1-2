@@ -67,7 +67,7 @@ void* ThreadFunc(void* arg) {
 
         const InputRow& row = (*data->input_rows)[row_index];
         char encrypted[65];
-        ComputeIterativeSHA256Hex(
+        ComputeIterativeSha256Hex(
             reinterpret_cast<const uint8_t*>(row.text.c_str()),
             row.text.length(),
             row.iterations,
