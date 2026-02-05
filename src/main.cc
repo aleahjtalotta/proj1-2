@@ -5,7 +5,7 @@
 #include <fstream>
 #include <string>
 #include <sys/sysinfo.h>
-#inclide <pthread.h>
+#include <pthread.h>
 #include <cstring>
 
 #include "../lib/cli_parser.h"
