@@ -31,7 +31,7 @@ struct ThreadData {
   std::vector<std::string>* out;
 };
 
-void* ThreadFunc(void* arg) {
+static void* ThreadFunc(void* arg) {
   ThreadData* d = static_cast<ThreadData*>(arg);
 
   if (d->tid > d->k) {
@@ -58,7 +58,7 @@ void* ThreadFunc(void* arg) {
     d->released[d->tid + 1] = true;
   }
 
-  int total = d->in->size();
+  const int total = static_cast<int>(d->in->size());
 
   for (int i = 0; !*(d->should_exit); i++) {
     if (Timings_TimeoutExpired(d->start, d->timeout_ms)) {
@@ -66,13 +66,13 @@ void* ThreadFunc(void* arg) {
       break;
     }
 
-    int row = d->tid + i * d->k;
-    int idx = row - 1;
+    const int row = d->tid + i * d->k;
+    const int idx = row - 1;
     if (idx >= total) break;
 
     const InputRow& r = (*d->in)[idx];
-    char hex[65];
 
+    char hex[65];
     ComputeIterativeSha256Hex(
         reinterpret_cast<const uint8_t*>(r.text.c_str()),
         r.text.size(),
@@ -92,24 +92,24 @@ int main(int argc, char** argv) {
   uint32_t timeout_ms;
   CliParse(argc, argv, &mode, &timeout_ms);
 
-  int row_count;
   std::string line;
-
   if (!std::getline(std::cin, line)) Dief("no input");
+
+  int row_count = 0;
   {
     std::istringstream iss(line);
-    iss >> row_count;
+    if (!(iss >> row_count)) Dief("bad row count");
   }
 
   std::vector<InputRow> input;
   input.reserve(row_count);
 
   for (int i = 0; i < row_count; i++) {
-    if (!std::getline(std::cin, line)) break;
+    if (!std::getline(std::cin, line)) Dief("missing rows");
     std::istringstream iss(line);
     std::string id;
     InputRow r;
-    if (!(iss >> id >> r.text >> r.iterations)) Dief("bad input");
+    if (!(iss >> id >> r.text >> r.iterations)) Dief("bad row");
     input.push_back(r);
   }
 
@@ -117,28 +117,37 @@ int main(int argc, char** argv) {
   std::cout.flush();
 
   std::ifstream tty_in("/dev/tty");
-  if (!tty_in) Die("tty error");
+  if (!tty_in) Die("Cannot open /dev/tty");
 
-  int k;
+  int k = 0;
   tty_in >> k;
-  if (k < 1 || k > 8) Dief("bad k");
+  if (k < 1 || k > 8) Dief("Thread count must be between 1 and 8");
 
-  int n = get_nprocs();
+  const int n = get_nprocs();
 
   std::vector<std::string> output(input.size());
+
   volatile bool should_exit = false;
 
-  volatile bool* released = new bool[n + 1];
-  for (int i = 0; i <= n; i++) released[i] = false;
+  volatile bool* released = new bool[n + 2];
+  for (int i = 0; i < n + 2; i++) released[i] = false;
 
-  Timings_t start = Timings_NowMs();
+  const Timings_t start = Timings_NowMs();
 
   std::vector<pthread_t> threads(n);
   std::vector<ThreadData> td(n);
 
   for (int i = 0; i < n; i++) {
-    td[i] = {i + 1, k, mode, timeout_ms, start,
-             &should_exit, released, &input, &output};
+    td[i].tid = i + 1;
+    td[i].k = k;
+    td[i].mode = mode;
+    td[i].timeout_ms = timeout_ms;
+    td[i].start = start;
+    td[i].should_exit = &should_exit;
+    td[i].released = released;
+    td[i].in = &input;
+    td[i].out = &output;
+
     pthread_create(&threads[i], nullptr, ThreadFunc, &td[i]);
   }
 
@@ -153,12 +162,14 @@ int main(int argc, char** argv) {
     released[1] = true;
   }
 
-  for (int i = 0; i < n; i++) pthread_join(threads[i], nullptr);
+  for (int i = 0; i < n; i++) {
+    pthread_join(threads[i], nullptr);
+  }
 
   ThreadLog("Thread Start Encryption");
   for (size_t i = 0; i < input.size(); i++) {
     if (output[i].empty()) continue;
-    std::string h = output[i];
+    const std::string& h = output[i];
     std::string t = h.substr(0, 16) + "..." + h.substr(h.size() - 16);
     ThreadLog("%zu %s %s", i + 1, input[i].text.c_str(), t.c_str());
   }
