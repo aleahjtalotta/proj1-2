@@ -1,14 +1,12 @@
 // Copyright Aleah Talotta 2026
 #include <pthread.h>
 #include <sys/sysinfo.h>
-
 #include <cstdint>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <vector>
-
 #include "../lib/cli_parser.h"
 #include "../lib/error.h"
 #include "../lib/sha256.h"
@@ -28,8 +26,7 @@ struct ThreadData {
   Timings_t start;
   volatile bool* released;
   const std::vector<InputRow>* in;
-  std::vector<std::string>* out;
-};
+  std::vector<std::string>* out; };
 
 static void* ThreadFunc(void* arg) {
   ThreadData* d = static_cast<ThreadData*>(arg);
@@ -73,7 +70,6 @@ static void* ThreadFunc(void* arg) {
         r.text.size(),
         r.iterations,
         hex);
-
     (*d->out)[idx] = hex;
     ThreadLog("[thread %d] completed row %d", d->tid, row);
   }
@@ -81,7 +77,6 @@ static void* ThreadFunc(void* arg) {
   ThreadLog("[thread %d] returned", d->tid);
   return nullptr;
 }
-
 int main(int argc, char** argv) {
   CliMode mode;
   uint32_t timeout_ms;
@@ -156,7 +151,7 @@ int main(int argc, char** argv) {
   for (int i = 0; i < n; i++) {
     pthread_join(threads[i], nullptr);
   }
-
+  
   ThreadLog("Thread Start Encryption");
   for (size_t i = 0; i < input.size(); i++) {
     if (output[i].empty()) continue;
@@ -167,7 +162,6 @@ int main(int argc, char** argv) {
     std::string t = h.substr(0, 16) + "..." + h.substr(h.size() - 16);
     ThreadLog("%d %s %s", tid, input[i].text.c_str(), t.c_str());
   }
-
   delete[] released;
   return 0;
 }
