@@ -1,3 +1,4 @@
+// Copyright Aleah Talotta 2026
 #include <pthread.h>
 #include <sys/sysinfo.h>
 
@@ -25,7 +26,6 @@ struct ThreadData {
   CliMode mode;
   uint32_t timeout_ms;
   Timings_t start;
-  volatile bool* should_exit;
   volatile bool* released;
   const std::vector<InputRow>* in;
   std::vector<std::string>* out;
@@ -34,20 +34,15 @@ struct ThreadData {
 static void* ThreadFunc(void* arg) {
   ThreadData* d = static_cast<ThreadData*>(arg);
 
-  if (d->tid > d->k) {
-    ThreadLog("[thread %d] returned", d->tid);
-    return nullptr;
-  }
-
-  while (!d->released[d->tid] && !*(d->should_exit)) {
+  while (!d->released[d->tid]) {
     Timings_SleepMs(1);
     if (Timings_TimeoutExpired(d->start, d->timeout_ms)) {
-      *(d->should_exit) = true;
-      break;
+      ThreadLog("[thread %d] returned", d->tid);
+      return nullptr;
     }
   }
 
-  if (*(d->should_exit)) {
+  if (d->tid > d->k) {
     ThreadLog("[thread %d] returned", d->tid);
     return nullptr;
   }
@@ -60,10 +55,10 @@ static void* ThreadFunc(void* arg) {
 
   const int total = static_cast<int>(d->in->size());
 
-  for (int i = 0; !*(d->should_exit); i++) {
+  for (int i = 0;; i++) {
     if (Timings_TimeoutExpired(d->start, d->timeout_ms)) {
-      *(d->should_exit) = true;
-      break;
+      ThreadLog("[thread %d] returned", d->tid);
+      return nullptr;
     }
 
     const int row = d->tid + i * d->k;
@@ -113,21 +108,18 @@ int main(int argc, char** argv) {
     input.push_back(r);
   }
 
-  std::cout << "Enter max threads (1 - 8): ";
-  std::cout.flush();
+  const int n = get_nprocs();
 
+  std::ofstream tty_out("/dev/tty");
   std::ifstream tty_in("/dev/tty");
-  if (!tty_in) Die("Cannot open /dev/tty");
+  if (!tty_in || !tty_out) Die("Cannot open /dev/tty");
 
   int k = 0;
+  tty_out << "Enter max threads (1 - 8): " << std::flush;
   tty_in >> k;
   if (k < 1 || k > 8) Dief("Thread count must be between 1 and 8");
 
-  const int n = get_nprocs();
-
   std::vector<std::string> output(input.size());
-
-  volatile bool should_exit = false;
 
   volatile bool* released = new bool[n + 2];
   for (int i = 0; i < n + 2; i++) released[i] = false;
@@ -143,7 +135,6 @@ int main(int argc, char** argv) {
     td[i].mode = mode;
     td[i].timeout_ms = timeout_ms;
     td[i].start = start;
-    td[i].should_exit = &should_exit;
     td[i].released = released;
     td[i].in = &input;
     td[i].out = &output;
@@ -169,9 +160,12 @@ int main(int argc, char** argv) {
   ThreadLog("Thread Start Encryption");
   for (size_t i = 0; i < input.size(); i++) {
     if (output[i].empty()) continue;
+    size_t row = i + 1;
+    int tid = static_cast<int>(((row - 1) % static_cast<size_t>(k)) + 1);
+
     const std::string& h = output[i];
     std::string t = h.substr(0, 16) + "..." + h.substr(h.size() - 16);
-    ThreadLog("%zu %s %s", i + 1, input[i].text.c_str(), t.c_str());
+    ThreadLog("%d %s %s", tid, input[i].text.c_str(), t.c_str());
   }
 
   delete[] released;
