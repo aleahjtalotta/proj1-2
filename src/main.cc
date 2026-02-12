@@ -15,8 +15,7 @@
 
 struct InputRow {
   std::string text;
-  int iterations;
-};
+  int iterations; };
 
 struct ThreadData {
   int tid;
@@ -28,32 +27,33 @@ struct ThreadData {
   const std::vector<InputRow>* in;
   std::vector<std::string>* out; };
 
-static void* ThreadFunc(void* arg) {
-  ThreadData* d = static_cast<ThreadData*>(arg);
+static void* ThreadFunc(void* arg) {  // thread entry funct.
+  ThreadData* d = static_cast<ThreadData*>(arg); // gets thread data
 
   while (!d->released[d->tid]) {
-    Timings_SleepMs(1);
+    Timings_SleepMs(1);  // this is so we dont busy wait 
     if (Timings_TimeoutExpired(d->start, d->timeout_ms)) {
       ThreadLog("[thread %d] returned", d->tid);
       return nullptr;
     }
   }
 
-  if (d->tid > d->k) {
+  if (d->tid > d->k) {  // if thread bigger than 5, exits immediately 
     ThreadLog("[thread %d] returned", d->tid);
     return nullptr;
   }
 
-  ThreadLog("[thread %d] started", d->tid);
+  ThreadLog("[thread %d] started", d->tid); // log that I started work
+
 
   if (d->mode == CLI_MODE_THREAD && d->tid < d->k) {
-    d->released[d->tid + 1] = true;
+    d->released[d->tid + 1] = true; // realeases next thread
   }
 
-  const int total = static_cast<int>(d->in->size());
+  const int total = static_cast<int>(d->in->size()); // number of input rows
 
   for (int i = 0;; i++) {
-    if (Timings_TimeoutExpired(d->start, d->timeout_ms)) {
+    if (Timings_TimeoutExpired(d->start, d->timeout_ms)) { // stops if timeout hits 
       ThreadLog("[thread %d] returned", d->tid);
       return nullptr;
     }
@@ -64,8 +64,8 @@ static void* ThreadFunc(void* arg) {
 
     const InputRow& r = (*d->in)[idx];
 
-    char hex[65];
-    ComputeIterativeSha256Hex(
+    char hex[65];  
+    ComputeIterativeSha256Hex(  // do the hashing work for this row
         reinterpret_cast<const uint8_t*>(r.text.c_str()),
         r.text.size(),
         r.iterations,
@@ -77,7 +77,7 @@ static void* ThreadFunc(void* arg) {
   ThreadLog("[thread %d] returned", d->tid);
   return nullptr;
 }
-int main(int argc, char** argv) {
+int main(int argc, char** argv) {  // program starts 
   CliMode mode;
   uint32_t timeout_ms;
   CliParse(argc, argv, &mode, &timeout_ms);
@@ -92,7 +92,7 @@ int main(int argc, char** argv) {
   }
 
   std::vector<InputRow> input;
-  input.reserve(row_count);
+  input.reserve(row_count);  // reserve space for rows 
 
   for (int i = 0; i < row_count; i++) {
     if (!std::getline(std::cin, line)) Dief("missing rows");
@@ -103,7 +103,8 @@ int main(int argc, char** argv) {
     input.push_back(r);
   }
 
-  const int n = get_nprocs();
+  const int n = get_nprocs(); // how many CPU contexts (how many threads to create)
+
 
   std::ofstream tty_out("/dev/tty");
   std::ifstream tty_in("/dev/tty");
@@ -116,7 +117,7 @@ int main(int argc, char** argv) {
 
   std::vector<std::string> output(input.size());
 
-  volatile bool* released = new bool[n + 2];
+  volatile bool* released = new bool[n + 2];   // releases flags for each thread id
   for (int i = 0; i < n + 2; i++) released[i] = false;
 
   const Timings_t start = Timings_NowMs();
@@ -137,9 +138,9 @@ int main(int argc, char** argv) {
     pthread_create(&threads[i], nullptr, ThreadFunc, &td[i]);
   }
 
-  if (mode == CLI_MODE_ALL) {
+  if (mode == CLI_MODE_ALL) {   // releases all at once
     for (int i = 1; i <= k; i++) released[i] = true;
-  } else if (mode == CLI_MODE_RATE) {
+  } else if (mode == CLI_MODE_RATE) {   // realease 1 per ms
     for (int i = 1; i <= k; i++) {
       released[i] = true;
       Timings_SleepMs(1);
@@ -148,7 +149,7 @@ int main(int argc, char** argv) {
     released[1] = true;
   }
 
-  for (int i = 0; i < n; i++) {
+  for (int i = 0; i < n; i++) {   // wait for all threads to finish
     pthread_join(threads[i], nullptr);
   }
   
@@ -159,7 +160,7 @@ int main(int argc, char** argv) {
     int tid = static_cast<int>(((row - 1) % static_cast<size_t>(k)) + 1);
 
     const std::string& h = output[i];
-    std::string t = h.substr(0, 16) + "..." + h.substr(h.size() - 16);
+    std::string t = h.substr(0, 16) + "..." + h.substr(h.size() - 16);  // shorten hash for printing
     ThreadLog("%d %s %s", tid, input[i].text.c_str(), t.c_str());
   }
   delete[] released;
