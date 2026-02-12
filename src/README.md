@@ -1,25 +1,28 @@
-# CSCE 311 Project 1 
+# CSCE 311 Project 1
 
-# Description
-This project is a simple demonstration of multi-threading using POSIX threads in a Linux environment.
-The program creates a number of threads equal to the number of available CPU cores and then allows up to
-`k` of those threads to run using different release strategies. The goal is to observe how threads behave
-and how race conditions appear when no synchronization is used.
+## src/main.cc
 
-# src/main.cc
-This file contains the main program logic.
+This file contains all of the code for the project.
 
-It does the following:
-- Parses command-line arguments (`--all`, `--rate`, `--thread`, and optional `--timeout`)
-- Reads all input rows from standard input
-- Prompts the user for the maximum number of threads (`k`) using `/dev/tty`
-- Gets the number of available processors using `get_nprocs()`
-- Creates `n` paused threads
-- Releases the first `k` threads according to the selected mode
-- Assigns work to threads using the rule  
-  `row = thread_id + i × k`
-- Makes threads with an index greater than `k` exit immediately
-- Stops threads when they finish their work or when the timeout expires
-- Waits for all threads to finish and prints a final report
+The program starts with the command-line arguments to determine which mode is being used --all , --rate , or --thread and whether a timeout was provided. next it reads all input rows from standard input using file redirection.
 
-No synchronization primitives are used, and thread execution order is intentionally nondeterministic.
+After reading the input, the program prompts the user for the maximum number of threads k using /dev/tty. This makes sure the prompt still works even when input is redirected from a file.
+
+The program gets the number of available processors using get_nprocs() and creates that many pthreads. All threads start in a paused state and wait in a loop using Timings_SleepMs(1) until they are released.
+
+The release modes work like this:
+
+--all: releases the first k threads at the same time.
+--rate: releases one thread every ms.
+--thread: the main thread releases thread 1, and then each thread releases the next thread.
+
+Each thread processes rows using the formula:
+
+    row = thread num + i * k
+
+Threads log when they start, when they complete a row, and when they return. If a thread number is greater than k, it will exit quick. Also threads will stop running if the timeout expires of course.
+
+The hashing is completed using the ComputeIterativeSha256Hex function in the code. After all threads finish, the program 
+prints the final report labeled which is "Thread Start Encryption" and displays the thread #, the input text, and a smaller version of the hash.
+
+# didnt use the main.h file just main.cc

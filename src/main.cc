@@ -30,6 +30,10 @@ struct ThreadData {
 static void* ThreadFunc(void* arg) {  // thread entry funct.
   ThreadData* d = static_cast<ThreadData*>(arg); // gets thread data
 
+  if (d->tid > d->k) {  // if thread bigger than k, exits immediately 
+    ThreadLog("[thread %d] returned", d->tid);
+    return nullptr;
+  }
   while (!d->released[d->tid]) {
     Timings_SleepMs(1);  // this is so we dont busy wait 
     if (Timings_TimeoutExpired(d->start, d->timeout_ms)) {
@@ -38,16 +42,10 @@ static void* ThreadFunc(void* arg) {  // thread entry funct.
     }
   }
 
-  if (d->tid > d->k) {  // if thread bigger than 5, exits immediately 
-    ThreadLog("[thread %d] returned", d->tid);
-    return nullptr;
-  }
-
   ThreadLog("[thread %d] started", d->tid); // log that I started work
 
-
   if (d->mode == CLI_MODE_THREAD && d->tid < d->k) {
-    d->released[d->tid + 1] = true; // realeases next thread
+  d->released[d->tid + 1] = true; // realeases next thread
   }
 
   const int total = static_cast<int>(d->in->size()); // number of input rows
